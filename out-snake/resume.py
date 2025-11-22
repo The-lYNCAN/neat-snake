@@ -30,7 +30,7 @@ def resume_neat(config_path, checkpoint_path, additional_generations=100):
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
-    p.add_reporter(neat.Checkpointer(generation_interval=10, time_interval_seconds=None,
+    p.add_reporter(neat.Checkpointer(generation_interval=3, time_interval_seconds=None,
                                      filename_prefix='neat-checkpoint-'))
 
     # Run for additional generations
@@ -47,4 +47,4 @@ def resume_neat(config_path, checkpoint_path, additional_generations=100):
 
     return winner, stats
 
-resume_neat("./../snake_config.ini", "./neat-checkpoint-14", 2)
+resume_neat("./../snake_config.ini", "./neat-checkpoint-19", 2)

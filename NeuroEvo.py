@@ -8,7 +8,7 @@ import os
 
 
 def eval(net):
-    game = SnakeGame(net, use_neural_network=True, difficulty=201)
+    game = SnakeGame(net, use_neural_network=True, difficulty=200)
     score = game.run()
     return score
 
@@ -29,7 +29,7 @@ p.add_reporter(stats)
 p.add_reporter(neat.Checkpointer(5,
            filename_prefix='out-snake/neat-checkpoint-'))
 
-best_genome = p.run(eval_genomes, 20)
+best_genome = p.run(eval_genomes, 50)
 with open('out-snake/best_genome.pkl', 'wb') as f:
     pickle.dump(best_genome, f)
 net = neat.nn.FeedForwardNetwork.create(best_genome, config)

@@ -229,9 +229,9 @@ class SnakeGame:
         current_distance = abs(self.snake_pos[0] - self.food_pos[0]) + abs(self.snake_pos[1] - self.food_pos[1])
         if self.last_food_distance is not None:
             if current_distance < self.last_food_distance:
-                self.fitness += 1  # Reward for moving closer
+                self.score += 0.01  # Reward for moving closer
             else:
-                self.fitness -= 2  # Penalty for moving away
+                self.score -= .02  # Penalty for moving away
         self.last_food_distance = current_distance
 
         # Snake body growing mechanism
@@ -304,123 +304,27 @@ class SnakeGame:
 
     def get_inputs(self):
         rays = []
-        angles = [45, 90, -45, -90, 135, -135, 180]
-        direction = {"DOWN": 0, "UP": 1, "RIGHT": 2, "LEFT": 3}
-        direction = direction[self.direction]
-
-        # Frame normalization values
-        diag = math.sqrt(self.frame_size_x ** 2 + self.frame_size_y ** 2)
-
-        # Corners (unused but kept)
-        topLeft = (0, 0)
-        topRight = (self.frame_size_x - 1, 0)
-        bottomLeft = (0, self.frame_size_y - 1)
-        bottomRight = (self.frame_size_x - 1, self.frame_size_y - 1)
-
-        (x, y) = self.snake_pos
-
-        # Normalize head position
-        norm_x = x / self.frame_size_x
-        norm_y = y / self.frame_size_y
-
-        # ---- Movement direction encoding (unchanged) ----
-        if direction == 0:  # DOWN
-            rays.append(0)
-            rays.append(0)
-
-            downStraight = (self.frame_size_y - y) / self.frame_size_y
-            rightStraight = (self.frame_size_x - x) / self.frame_size_x
-            leftStraight = x / self.frame_size_x
-
-            for i in angles:
-                i = math.radians(i)
-                raw = (self.frame_size_y - y) / math.cos(math.radians(i))
-                hypo = raw / diag
-                rays.append(1 / hypo if hypo != 0 else 0)
-
-            rays.append(1 / leftStraight if leftStraight != 0 else 0)
-            rays.append(1 / rightStraight if rightStraight != 0 else 0)
-            rays.append(1 / downStraight if downStraight != 0 else 0)
-
-        if direction == 1:  # UP
-            rays.append(0)
-            rays.append(1)
-
-            upStraight = y / self.frame_size_y
-            rightStraight = (self.frame_size_x - x) / self.frame_size_x
-            leftStraight = x / self.frame_size_x
-
-            for i in angles:
-                i = math.radians(i)
-                raw = y / math.cos(math.radians(i))
-                hypo = raw / diag
-                rays.append(1 / hypo if hypo != 0 else 0)
-
-            rays.append(1 / rightStraight if rightStraight != 0 else 0)
-            rays.append(1 / leftStraight if leftStraight != 0 else 0)
-            rays.append(1 / upStraight if upStraight != 0 else 0)
-
-        if direction == 2:  # RIGHT
-            rays.append(1)
-            rays.append(0)
-
-            rightStraight = (self.frame_size_x - x) / self.frame_size_x
-            upStraight = y / self.frame_size_y
-            downStraight = (self.frame_size_y - y) / self.frame_size_y
-
-            for i in angles:
-                i = math.radians(i)
-                raw = (self.frame_size_x - x) / math.cos(math.radians(i))
-                hypo = raw / diag
-                rays.append(1 / hypo if hypo != 0 else 0)
-
-            rays.append(1 / downStraight if downStraight != 0 else 0)
-            rays.append(1 / upStraight if upStraight != 0 else 0)
-            rays.append(1 / rightStraight if rightStraight != 0 else 0)
-
-        if direction == 3:  # LEFT
-            rays.append(1)
-            rays.append(1)
-
-            leftStraight = x / self.frame_size_x
-            upStraight = y / self.frame_size_y
-            downStraight = (self.frame_size_y - y) / self.frame_size_y
-
-            for i in angles:
-                i = math.radians(i)
-                raw = x / math.cos(math.radians(i))
-                hypo = raw / diag
-                rays.append(1 / hypo if hypo != 0 else 0)
-
-            rays.append(1 / upStraight if upStraight != 0 else 0)
-            rays.append(1 / downStraight if downStraight != 0 else 0)
-            rays.append(1 / leftStraight if leftStraight != 0 else 0)
-
-        # ---- Food info ----
-        palletX, palletY = self.food_pos
-
-        # Normalize food position
-        norm_food_x = palletX / self.frame_size_x
-        norm_food_y = palletY / self.frame_size_y
-
-        # Distance to food (normalized)
-        disFood = math.sqrt((palletX - x) ** 2 + (palletY - y) ** 2)
-        normFoodDist = disFood / diag
-
-        # Angle to food normalized to [0,1]
-        base = x - palletX
-        angle = math.acos(base / disFood) if disFood != 0 else 0
-        normAngle = angle / math.pi
-
-        # Final normalized inputs
-        rays.append(norm_y)
-        rays.append(norm_x)
-        rays.append(1 / normFoodDist if normFoodDist != 0 else 0)
-        rays.append(normAngle)
-        rays.append(norm_food_x)
-        rays.append(norm_food_y)
-
+        directions = ['UP', 'DOWN', 'LEFT', 'RIGHT']
+        direction = directions.index(self.direction)
+        rays.append(direction)
+        top = self.snake_pos[1]/self.frame_size_y
+        left = self.snake_pos[0]/self.frame_size_x
+        bottom = abs(self.frame_size_y - self.snake_pos[1])/self.frame_size_y
+        right = abs(self.frame_size_x - self.snake_pos[0])/self.frame_size_x
+        foodAtBottom = 1 if self.snake_pos[0] == self.food_pos[0] and self.snake_pos[1]< self.food_pos[1] else (-1 if self.snake_pos[0] == self.food_pos[0] and self.snake_pos[1] > self.food_pos[1] else 0)
+        leftRightInd = 1 if self.snake_pos[1] == self.food_pos[1] and self.snake_pos[0] < self.food_pos[0] else (-1 if self.snake_pos[1] == self.food_pos[1] and self.snake_pos[0] > self.food_pos[0] else 0)
+        rays.append(top)
+        rays.append(leftRightInd)
+        rays.append(bottom)
+        rays.append(right)
+        rays.append(foodAtBottom)
+        rays.append(left)
+        rays.append(self.snake_pos[0]/self.frame_size_x)
+        rays.append(self.snake_pos[1]/self.frame_size_y)
+        rays.append(self.food_pos[0]/self.frame_size_x)
+        rays.append(self.food_pos[1]/self.frame_size_y)
         return rays
+
 
     def step(self, action=None):
         """Perform one step of the game, optionally taking an action."""
@@ -474,7 +378,6 @@ class SnakeGame:
         counter = 0
         while True:
             state, score = self.step()
-            self.score = self.score + 1/40
             if self.idle > 200:
                 return self.score + counter/40 - self.last_food_distance/100
             counter += 1
