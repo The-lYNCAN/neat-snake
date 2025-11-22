@@ -29,7 +29,7 @@ p.add_reporter(stats)
 p.add_reporter(neat.Checkpointer(5,
            filename_prefix='out-snake/neat-checkpoint-'))
 
-best_genome = p.run(eval_genomes, 50)
+best_genome = p.run(eval_genomes, 100)
 with open('out-snake/best_genome.pkl', 'wb') as f:
     pickle.dump(best_genome, f)
 net = neat.nn.FeedForwardNetwork.create(best_genome, config)

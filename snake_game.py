@@ -35,6 +35,9 @@ class SnakeGame:
         self.frame_size_x = frame_size_x
         self.frame_size_y = frame_size_y
         self.idle = 0
+        self.cell_w = frame_size_x // 10  # Number of cells horizontally (72)
+        self.cell_h = frame_size_y // 10  # Number of cells vertically (48)
+        self.body_set = set()
 
         # Initialize Pygame
         check_errors = pygame.init()
@@ -84,6 +87,12 @@ class SnakeGame:
         self.direction = 'RIGHT'
         self.change_to = self.direction
         self.score = 0
+        self.snake_pos = self.snake_body[0].copy()  # [x, y]
+
+        # ADD: Initialize body_set (exclude head)
+        self.body_set = set()
+        for block in self.snake_body[1:]:
+            self.body_set.add(tuple(block))
         self.game_over_flag = False
         self.position_history = []  # Store last N positions
         self.max_steps = 1000  # Max steps to prevent infinite loops
@@ -201,10 +210,7 @@ class SnakeGame:
         #     if position_counts[pos] > 10:  # Same position visited too often
         #         self.fitness -= 10  # Penalize looping
         #         return self.game_over()
-        if self.snake_body in self.position_history:
-            self.score -= 100
-            return self.game_over()
-        self.position_history.append(self.snake_body[0])
+
 
         # Update direction, preventing instant reversal
         if self.change_to == 'UP' and self.direction != 'DOWN':
@@ -229,9 +235,9 @@ class SnakeGame:
         current_distance = abs(self.snake_pos[0] - self.food_pos[0]) + abs(self.snake_pos[1] - self.food_pos[1])
         if self.last_food_distance is not None:
             if current_distance < self.last_food_distance:
-                self.score += 0.01  # Reward for moving closer
+                self.score += .1  # Reward for moving closer
             else:
-                self.score -= .02  # Penalty for moving away
+                self.score -= .2  # Penalty for moving away
         self.last_food_distance = current_distance
 
         # Snake body growing mechanism
@@ -252,7 +258,6 @@ class SnakeGame:
         # Check game over conditions
         if (self.snake_pos[0] < 0 or self.snake_pos[0] > self.frame_size_x-10 or
                 self.snake_pos[1] < 0 or self.snake_pos[1] > self.frame_size_y-10):
-            self.score -= 125
             return self.game_over()
         for block in self.snake_body[1:]:
             if self.snake_pos[0] == block[0] and self.snake_pos[1] == block[1]:
@@ -302,28 +307,58 @@ class SnakeGame:
         e_x = np.exp(x - np.max(x))
         return e_x / e_x.sum(axis=0)
 
+    def _danger_in_direction(self, cell_dx, cell_dy, max_look=4):
+        """Returns 1.0 if wall OR body within next `max_look` cells, else 0.0"""
+        head_cell_x = self.snake_pos[0] // 10
+        head_cell_y = self.snake_pos[1] // 10
+        x, y = head_cell_x + cell_dx, head_cell_y + cell_dy
+
+        for _ in range(max_look):  # Look ahead 4 cells max
+            if not (0 <= x < self.cell_w and 0 <= y < self.cell_h):
+                return 1.0  # Wall!
+            if (x * 10, y * 10) in self.body_set:
+                return 1.0  # Body!
+            x += cell_dx
+            y += cell_dy
+        return 0.0  # Safe
+
+    def _food_in_direction(self, cell_dx, cell_dy, max_look=10):
+        """Returns 1.0 if food in this ray (any distance), else 0.0"""
+        head_cell_x = self.snake_pos[0] // 10
+        head_cell_y = self.snake_pos[1] // 10
+        food_cell_x, food_cell_y = self.food_pos[0] // 10, self.food_pos[1] // 10
+        x, y = head_cell_x + cell_dx, head_cell_y + cell_dy
+
+        for _ in range(max_look):
+            if x == food_cell_x and y == food_cell_y:
+                return 1.0
+            if not (0 <= x < self.cell_w and 0 <= y < self.cell_h):
+                break
+            x += cell_dx
+            y += cell_dy
+        return 0.0
+
     def get_inputs(self):
-        rays = []
-        directions = ['UP', 'DOWN', 'LEFT', 'RIGHT']
-        direction = directions.index(self.direction)
-        rays.append(direction)
-        top = self.snake_pos[1]/self.frame_size_y
-        left = self.snake_pos[0]/self.frame_size_x
-        bottom = abs(self.frame_size_y - self.snake_pos[1])/self.frame_size_y
-        right = abs(self.frame_size_x - self.snake_pos[0])/self.frame_size_x
-        foodAtBottom = 1 if self.snake_pos[0] == self.food_pos[0] and self.snake_pos[1]< self.food_pos[1] else (-1 if self.snake_pos[0] == self.food_pos[0] and self.snake_pos[1] > self.food_pos[1] else 0)
-        leftRightInd = 1 if self.snake_pos[1] == self.food_pos[1] and self.snake_pos[0] < self.food_pos[0] else (-1 if self.snake_pos[1] == self.food_pos[1] and self.snake_pos[0] > self.food_pos[0] else 0)
-        rays.append(top)
-        rays.append(leftRightInd)
-        rays.append(bottom)
-        rays.append(right)
-        rays.append(foodAtBottom)
-        rays.append(left)
-        rays.append(self.snake_pos[0]/self.frame_size_x)
-        rays.append(self.snake_pos[1]/self.frame_size_y)
-        rays.append(self.food_pos[0]/self.frame_size_x)
-        rays.append(self.food_pos[1]/self.frame_size_y)
-        return rays
+        dir_map = {'UP': (0, -1), 'DOWN': (0, 1), 'LEFT': (-1, 0), 'RIGHT': (1, 0)}
+        dx, dy = dir_map[self.direction]
+
+        left_dir = (-dy, dx)
+        fwd_dir = (dx, dy)
+        right_dir = (dy, -dx)
+
+        inputs = []
+
+        # 3 directions × (danger? + food?)
+        for ddx, ddy in [left_dir, fwd_dir, right_dir]:
+            inputs.append(self._danger_in_direction(ddx, ddy, max_look=4))  # LOUD DANGER
+            inputs.append(self._food_in_direction(ddx, ddy, max_look=10))  # Food vision
+
+        # One-hot direction
+        onehot = [0.0] * 4
+        onehot[['UP', 'DOWN', 'LEFT', 'RIGHT'].index(self.direction)] = 1.0
+        inputs += onehot
+
+        return inputs  # 6 + 4 = 10 inputs
 
 
     def step(self, action=None):
@@ -379,14 +414,14 @@ class SnakeGame:
         while True:
             state, score = self.step()
             if self.idle > 200:
-                return self.score + counter/40 - self.last_food_distance/100
+                return self.score + 1/40
             counter += 1
             self.idle += 1
             if self.game_over_flag:
                 if counter < 500:
-                    return self.score + counter/40 - self.last_food_distance/100 - 100
+                    return self.score + 1/40
                 else:
-                    return self.score + counter/40 - self.last_food_distance/100
+                    return self.score + 1/40
 
 
 # Example usage
