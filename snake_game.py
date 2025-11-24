@@ -1,3 +1,8 @@
+import os
+# os.environ['SDL_AUDIODRIVER'] = 'dummy'
+# os.environ['XDG_SESSION_TYPE'] = 'x11'  # Force X11 mode
+# os.environ['XDG_CURRENT_DESKTOP'] = ''   # No desktop environment
+# os.environ['SDL_VIDEODRIVER'] = 'dummy'
 import pygame
 import sys
 import time
@@ -38,8 +43,10 @@ class SnakeGame:
         self.cell_w = frame_size_x // 10  # Number of cells horizontally (72)
         self.cell_h = frame_size_y // 10  # Number of cells vertically (48)
         self.body_set = set()
+        self.current_direction = 0
 
         # Initialize Pygame
+        pygame.mixer.quit()
         check_errors = pygame.init()
         if check_errors[1] > 0:
             print(f'[!] Had {check_errors[1]} errors when initializing game, exiting...')
@@ -136,24 +143,26 @@ class SnakeGame:
         return state
 
     def show_score(self, choice, color, font, size):
-        """Display the score on the screen."""
-        score_font = pygame.font.SysFont(font, size)
-        score_surface = score_font.render('Score : ' + str(self.score), True, color)
-        score_rect = score_surface.get_rect()
-        if choice == 1:
-            score_rect.midtop = (self.frame_size_x/10, 15)
-        else:
-            score_rect.midtop = (self.frame_size_x/2, self.frame_size_y/1.25)
         if self.difficulty != 200:
-            self.game_window.blit(score_surface, score_rect)
+
+            """Display the score on the screen."""
+            score_font = pygame.font.SysFont(font, size)
+            score_surface = score_font.render('Score : ' + str(self.score), True, color)
+            score_rect = score_surface.get_rect()
+            if choice == 1:
+                score_rect.midtop = (self.frame_size_x/10, 15)
+            else:
+                score_rect.midtop = (self.frame_size_x/2, self.frame_size_y/1.25)
+            if self.difficulty != 200:
+                self.game_window.blit(score_surface, score_rect)
 
     def game_over(self):
         """Handle game over state, display score, and terminate."""
-        my_font = pygame.font.SysFont('times new roman', 90)
-        game_over_surface = my_font.render('YOU DIED', True, self.red)
-        game_over_rect = game_over_surface.get_rect()
-        game_over_rect.midtop = (self.frame_size_x/2, self.frame_size_y/4)
         if self.difficulty != 200:
+            my_font = pygame.font.SysFont('times new roman', 90)
+            game_over_surface = my_font.render('YOU DIED', True, self.red)
+            game_over_rect = game_over_surface.get_rect()
+            game_over_rect.midtop = (self.frame_size_x/2, self.frame_size_y/4)
 
             self.game_window.fill(self.black)
             self.game_window.blit(game_over_surface, game_over_rect)
@@ -183,25 +192,13 @@ class SnakeGame:
                         self.change_to = 'RIGHT'
                     if event.key == pygame.K_ESCAPE:
                         pygame.event.post(pygame.event.Event(pygame.QUIT))
-        # else:
-        #     net = SimpleNeuralNetwork(8, 17, 4).forward(self.get_game_state())
-        #     print(net)
-        #     if net == 0:
-        #         self.change_to = 'UP'
-        #     if net == 1:
-        #         self.change_to = 'DOWN'
-        #     if net == 2:
-        #         self.change_to = 'LEFT'
-        #     if net == 3:
-        #         self.change_to = 'RIGHT'
+
 
     def update(self):
         """Update the game state."""
         if self.game_over_flag:
             return
-        self.position_history.append(tuple(self.snake_pos))
-        if len(self.position_history) > 50:
-            self.position_history.pop(0)
+
 
         # Check for looping (repeated positions)
         position_counts = {}
@@ -232,13 +229,7 @@ class SnakeGame:
         if self.direction == 'RIGHT':
             self.snake_pos[0] += 10
 
-        current_distance = abs(self.snake_pos[0] - self.food_pos[0]) + abs(self.snake_pos[1] - self.food_pos[1])
-        if self.last_food_distance is not None:
-            if current_distance < self.last_food_distance:
-                self.score += .1  # Reward for moving closer
-            else:
-                self.score -= .2  # Penalty for moving away
-        self.last_food_distance = current_distance
+
 
         # Snake body growing mechanism
         self.snake_body.insert(0, list(self.snake_pos))
@@ -307,58 +298,96 @@ class SnakeGame:
         e_x = np.exp(x - np.max(x))
         return e_x / e_x.sum(axis=0)
 
-    def _danger_in_direction(self, cell_dx, cell_dy, max_look=4):
-        """Returns 1.0 if wall OR body within next `max_look` cells, else 0.0"""
-        head_cell_x = self.snake_pos[0] // 10
-        head_cell_y = self.snake_pos[1] // 10
-        x, y = head_cell_x + cell_dx, head_cell_y + cell_dy
+    def lineEquation(self):
+        pass
 
-        for _ in range(max_look):  # Look ahead 4 cells max
-            if not (0 <= x < self.cell_w and 0 <= y < self.cell_h):
-                return 1.0  # Wall!
-            if (x * 10, y * 10) in self.body_set:
-                return 1.0  # Body!
-            x += cell_dx
-            y += cell_dy
-        return 0.0  # Safe
 
-    def _food_in_direction(self, cell_dx, cell_dy, max_look=10):
-        """Returns 1.0 if food in this ray (any distance), else 0.0"""
-        head_cell_x = self.snake_pos[0] // 10
-        head_cell_y = self.snake_pos[1] // 10
-        food_cell_x, food_cell_y = self.food_pos[0] // 10, self.food_pos[1] // 10
-        x, y = head_cell_x + cell_dx, head_cell_y + cell_dy
-
-        for _ in range(max_look):
-            if x == food_cell_x and y == food_cell_y:
-                return 1.0
-            if not (0 <= x < self.cell_w and 0 <= y < self.cell_h):
-                break
-            x += cell_dx
-            y += cell_dy
-        return 0.0
 
     def get_inputs(self):
-        dir_map = {'UP': (0, -1), 'DOWN': (0, 1), 'LEFT': (-1, 0), 'RIGHT': (1, 0)}
-        dx, dy = dir_map[self.direction]
+        head_x, head_y = self.snake_pos
+        food_x, food_y = self.food_pos
+        body = set(tuple(b) for b in self.snake_body[1:])
 
-        left_dir = (-dy, dx)
-        fwd_dir = (dx, dy)
-        right_dir = (dy, -dx)
+        # Helper for checking collisions
+        def blocked(x, y):
+            return (
+                x < 0 or x >= self.frame_size_x or
+                y < 0 or y >= self.frame_size_y or
+                (x, y) in body
+            )
 
-        inputs = []
+        # Movement vectors for each direction
+        dirs = {
+            "UP":    (0, -10),
+            "DOWN":  (0, 10),
+            "LEFT":  (-10, 0),
+            "RIGHT": (10, 0)
+        }
 
-        # 3 directions × (danger? + food?)
-        for ddx, ddy in [left_dir, fwd_dir, right_dir]:
-            inputs.append(self._danger_in_direction(ddx, ddy, max_look=4))  # LOUD DANGER
-            inputs.append(self._food_in_direction(ddx, ddy, max_look=10))  # Food vision
+        left_of = {
+            "UP": "LEFT",
+            "DOWN": "RIGHT",
+            "LEFT": "DOWN",
+            "RIGHT": "UP"
+        }
 
-        # One-hot direction
-        onehot = [0.0] * 4
-        onehot[['UP', 'DOWN', 'LEFT', 'RIGHT'].index(self.direction)] = 1.0
-        inputs += onehot
+        right_of = {
+            "UP": "RIGHT",
+            "DOWN": "LEFT",
+            "LEFT": "UP",
+            "RIGHT": "DOWN"
+        }
 
-        return inputs  # 6 + 4 = 10 inputs
+        # Compute absolute moves
+        dF = dirs[self.direction]
+        dL = dirs[left_of[self.direction]]
+        dR = dirs[right_of[self.direction]]
+
+        # --- Obstacle sensors (1 = blocked, 0 = free) ---
+        Obs_F = 1 if blocked(head_x + dF[0], head_y + dF[1]) else 0
+        Obs_L = 1 if blocked(head_x + dL[0], head_y + dL[1]) else 0
+        Obs_R = 1 if blocked(head_x + dR[0], head_y + dR[1]) else 0
+
+        # --- Tail distance sensors (normalized) ---
+        def tail_distance(dx, dy):
+            step = 1
+            x, y = head_x, head_y
+
+            while True:
+                x += dx
+                y += dy
+
+                if blocked(x, y):
+                    # Normalize: max distance ≈ board diagonal
+                    dist = math.sqrt((x - head_x)**2 + (y - head_y)**2)
+                    diag = math.sqrt(self.frame_size_x**2 + self.frame_size_y**2)
+                    return dist / diag
+
+                step += 1
+
+        Tail_F = tail_distance(dF[0], dF[1])
+        Tail_L = tail_distance(dL[0], dL[1])
+        Tail_R = tail_distance(dR[0], dR[1])
+
+        # --- Food direction sensors (one-hot) ---
+        Food_L = 1 if food_x < head_x else 0
+        Food_R = 1 if food_x > head_x else 0
+        Food_U = 1 if food_y < head_y else 0
+        Food_D = 1 if food_y > head_y else 0
+
+        # --- Direction one-hot ---
+        Dir_U = 1 if self.direction == "UP" else 0
+        Dir_R = 1 if self.direction == "RIGHT" else 0
+        Dir_D = 1 if self.direction == "DOWN" else 0
+        Dir_L = 1 if self.direction == "LEFT" else 0
+
+        return [
+            Obs_F, Obs_L, Obs_R,
+            Tail_F, Tail_L, Tail_R,
+            Food_L, Food_R, Food_U, Food_D,
+            Dir_U, Dir_R, Dir_D, Dir_L
+        ]
+
 
 
     def step(self, action=None):
@@ -367,7 +396,6 @@ class SnakeGame:
         # print(self.snake_body)
         self.snake_matrix = np.zeros((self.frame_size_x, self.frame_size_y))
         # print(self)
-        # print(self.get_inputs())
         for i in self.snake_body:
             # print(i)
             self.snake_matrix[i[0], i[1]] = 1
@@ -378,11 +406,18 @@ class SnakeGame:
             # Use neural network to predict action
             # state = self.get_game_state()
             neuralOut = self.neural_network.activate(self.get_inputs())
-            # print(neuralOut)
-            action = softmax(neuralOut)
-            # print(action)
-            action_map = {0: 'UP', 1: 'DOWN', 2: 'LEFT', 3: 'RIGHT'}
-            self.change_to = action_map.get(action.index(max(action)), self.direction)
+            action = np.argmax(neuralOut)  # Just get the index of max value
+            relative_turns = {
+                'UP': ['UP', 'LEFT', 'RIGHT'],
+                'DOWN': ['DOWN', 'RIGHT', 'LEFT'],
+                'LEFT': ['LEFT', 'DOWN', 'UP'],
+                'RIGHT': ['RIGHT', 'UP', 'DOWN']
+            }
+
+            # action = 0 → go straight
+            # action = 1 → turn left
+            # action = 2 → turn right
+            self.change_to = relative_turns[self.direction][action]
             # print(action)
         elif action is None:
             # Use keyboard input if no action provided and neural network is disabled
@@ -413,21 +448,19 @@ class SnakeGame:
         counter = 0
         while True:
             state, score = self.step()
-            if self.idle > 200:
-                return self.score + 1/40
+            self.score += .0125
+            # if self.idle > 300:
+            #     return self.score
             counter += 1
             self.idle += 1
             if self.game_over_flag:
-                if counter < 500:
-                    return self.score + 1/40
-                else:
-                    return self.score + 1/40
+                return self.score
 
 
 # Example usage
 if __name__ == "__main__":
     # Run with neural network
-    game = SnakeGame()
+    game = SnakeGame(difficulty=10)
     final_score = game.run()
     print(f"Final Score: {final_score}")
     # print(SimpleNeuralNetwork(8, 16, 4).forward([1, 2, 3, 4, 54, 6, 7, 8]))

@@ -47,4 +47,4 @@ def resume_neat(config_path, checkpoint_path, additional_generations=100):
 
     return winner, stats
 
-resume_neat("./../snake_config.ini", "./neat-checkpoint-19", 2)
+resume_neat("snake_config.ini", "./out-snake/neat-checkpoint-14", 2)
